@@ -1,0 +1,73 @@
+# Production Docker Compose Override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This file overrides docker-compose.yml with production-specific settings:
+# - Removes host-mounted source volumes (uses built images instead)
+# - Adds SSL certificate volumes to Nginx
+# - Enables certbot for Let's Encrypt
+# - Sets production environment variables
+
+version: "3.9"
+
+services:
+  mongodb:
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  backend:
+    restart: always
+    volumes: []   # Remove dev source mount; use built image
+    environment:
+      - MONGO_URL=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017
+      - MONGO_DB=${MONGO_DB:-neurolab}
+      - ENV=production
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://synaping.com,https://www.synaping.com}
+      - SECRET_KEY=${SECRET_KEY}
+      - WORKERS=${WORKERS:-2}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  frontend:
+    restart: always
+    build:
+      target: production   # Use the production multi-stage build target
+    environment:
+      - VITE_API_URL=https://synaping.com
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  nginx:
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # Let's Encrypt certificate renewal
+  certbot:
+    image: certbot/certbot:latest
+    container_name: neurolab_certbot
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot --webroot-path /var/www/certbot; sleep 12h & wait $${!}; done;'"
+    networks:
+      - neurolab_net
