@@ -4,7 +4,7 @@ db = db.getSiblingDB('neurolab');
 // Create app user
 db.createUser({
   user: 'neurolab_app',
-  pwd: 'neurolab_app_secret',
+    pwd: process.env.MONGO_APP_PASSWORD || 'neurolab_app_CHANGEME',
   roles: [{ role: 'readWrite', db: 'neurolab' }],
 });
 
