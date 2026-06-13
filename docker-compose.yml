@@ -1,7 +1,6 @@
 version: "3.9"
-
 services:
-  # ── MongoDB ────────────────────────────────────────────────
+  # ── MongoDB ────────────────────────────────────────────────────────────
   mongodb:
     image: mongo:6.0
     container_name: neurolab_mongodb
@@ -10,6 +9,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-neurolab_secret}
       MONGO_INITDB_DATABASE: neurolab
+      # Passed to init.js so the app user is created with this password
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:-neurolab_app_CHANGEME}
     ports:
       - "27017:27017"
     volumes:
@@ -23,8 +24,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # ── FastAPI Backend ─────────────────────────────────────────
+  # ── FastAPI Backend ─────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -36,6 +36,7 @@ services:
       - MONGO_DB=neurolab
       - CORS_ORIGINS=http://localhost:3000,http://localhost:80
       - ENV=development
+      - SECRET_KEY=${SECRET_KEY:-dev_insecure_key_change_in_production}
     ports:
       - "8000:8000"
     depends_on:
@@ -51,8 +52,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-
-  # ── React Frontend ──────────────────────────────────────────
+  # ── React Frontend ──────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -73,8 +73,7 @@ services:
     networks:
       neurolab_net:
         ipv4_address: 172.20.0.4
-
-  # ── Nginx Reverse Proxy ─────────────────────────────────────
+  # ── Nginx Reverse Proxy ──────────────────────────────────────────────
   nginx:
     image: nginx:alpine
     container_name: neurolab_nginx
@@ -89,11 +88,9 @@ services:
     networks:
       neurolab_net:
         ipv4_address: 172.20.0.5
-
 volumes:
   mongo_data:
     driver: local
-
 networks:
   neurolab_net:
     driver: bridge
